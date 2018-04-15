@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="hint_y_offset">64dp</dimen>
+    <dimen name="timerView_TextSize_Big">90px</dimen>
+    <dimen name="timerView_TextSize_Small">70px</dimen>
+</resources>

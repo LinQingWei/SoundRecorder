@@ -1,14 +1,20 @@
 package cn.way.soundrecorder;
 
 import android.content.Context;
-import android.media.AudioManager;
-import android.media.MediaPlayer;
 import android.media.MediaRecorder;
-import android.os.Bundle;
 import android.os.Environment;
+import android.os.SystemClock;
+import android.os.storage.StorageManager;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+import cn.way.soundrecorder.ext.ExtensionHelper;
+import cn.way.soundrecorder.ext.IRecordingTimeCalculationExt;
+import cn.way.soundrecorder.service.SoundRecorderService;
+import cn.way.soundrecorder.util.LogUtil;
 
 /**
  * <pre>
@@ -18,261 +24,404 @@ import java.io.IOException;
  * </pre>
  */
 
-public class Recorder implements MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener {
-    private static final String SAMPLE_PREFIX = "recording";
-    private static final String SAMPLE_PATH_KEY = "sample_path";
-    private static final String SAMPLE_LENGTH_KEY = "sample_length";
-
-    public static final int IDLE_STATE = 0;
-    public static final int RECORDING_STATE = 1;
-    public static final int PLAYING_STATE = 2;
-
-    private int mState = IDLE_STATE;
+public class Recorder implements MediaRecorder.OnErrorListener {
+    private static final String TAG = "SR/Recorder";
+    private static final String SAMPLE_PREFIX = "record";
+    public static final String SAMPLE_SUFFIX = ".tmp";
+    public static final String RECORD_FOLDER = "Recording";
 
     public static final int NO_ERROR = 0;
     public static final int SDCARD_ACCESS_ERROR = 1;
     public static final int INTERNAL_ERROR = 2;
     public static final int IN_CALL_RECORD_ERROR = 3;
 
-    private OnStateChangedListener mOnStateChangedListener;
-
     // time at which latest record or play operation started
     private long mSampleStart;
     // length of current sample
-    private int mSampleLength;
+    private long mSampleLength;
+    private long mPreviousTime;
     private File mSampleFile;
 
     MediaRecorder mRecorder;
-    MediaPlayer mPlayer;
+    private RecorderListener mListener;
+    private final StorageManager mStorageManager;
 
-    public Recorder() {
+    private int mCurrentState = SoundRecorderService.STATE_IDLE;
+    private boolean[] mSelectEffect;
+
+    /**
+     * Recorder Callback.
+     */
+    public interface RecorderListener {
+        /**
+         * State Callback.
+         *
+         * @param recorder  the Recorder instance
+         * @param stateCode the status code
+         */
+        void onStateChanged(Recorder recorder, int stateCode);
+
+        /**
+         * Error Callback.
+         *
+         * @param recorder  the Recorder instance
+         * @param errorCode the error code
+         */
+        void onError(Recorder recorder, int errorCode);
     }
 
-    public void saveState(Bundle state) {
-        state.putString(SAMPLE_PATH_KEY, mSampleFile.getAbsolutePath());
-        state.putInt(SAMPLE_LENGTH_KEY, mSampleLength);
-    }
-
-    public void restoreState(Bundle state) {
-        String samplePath = state.getString(SAMPLE_PATH_KEY);
-        if (samplePath == null) {
-            return;
-        }
-        int sampleLength = state.getInt(SAMPLE_LENGTH_KEY, -1);
-        if (sampleLength == -1) {
-            return;
-        }
-
-        File file = new File(samplePath);
-        if (!file.exists())
-            return;
-        if (mSampleFile != null
-                && mSampleFile.getAbsolutePath().compareTo(file.getAbsolutePath()) == 0) {
-            return;
-        }
-
-        delete();
-        mSampleFile = file;
-        mSampleLength = sampleLength;
-
-        signalStateChanged(IDLE_STATE);
+    public Recorder(StorageManager storageManager, RecorderListener listener) {
+        mStorageManager = storageManager;
+        mListener = listener;
     }
 
     /**
-     * Resets the recorder state. If a sample was recorded, the file is deleted.
+     * set Recorder to initial state.
+     *
+     * @return
      */
-    public void delete() {
-        stop();
-
-        if (mSampleFile != null) {
-            mSampleFile.delete();
+    public boolean reset() {
+        boolean result = true;
+        synchronized (this) {
+            if (null != mRecorder) {
+                try {
+                    // To avoid NE while mCurrentState is not prepared.
+                    if (mCurrentState == SoundRecorderService.STATE_PAUSE_RECORDING
+                            || mCurrentState == SoundRecorderService.STATE_RECORDING) {
+                        mRecorder.stop();
+                    }
+                } catch (RuntimeException exception) {
+                    exception.printStackTrace();
+                    result = false;
+                    LogUtil.e(TAG,
+                            "<stopRecording> recorder illegalstate exception in recorder.stop()");
+                } finally {
+                    mRecorder.reset();
+                    mRecorder.release();
+                    mRecorder = null;
+                }
+            }
         }
-
         mSampleFile = null;
+        mPreviousTime = 0;
         mSampleLength = 0;
+        mSampleStart = 0;
+        // add for some error case for example pause or goon recording failed.
+        mCurrentState = SoundRecorderService.STATE_IDLE;
 
-        signalStateChanged(IDLE_STATE);
+        return result;
     }
 
     /**
-     * Resets the recorder state. If a sample was recorded, the file is left on disk and will
-     * be reused for a new recording.
+     * Start recording.
+     *
+     * @param context       the context
+     * @param params        the recording parameters.
+     * @param fileSizeLimit the file size limitation
+     * @return the record result
      */
-    public void clear() {
-        stop();
-
-        mSampleLength = 0;
-
-        signalStateChanged(IDLE_STATE);
-    }
-
-    public void startRecording(Context context, int outputFileFormat, String extension) {
-        stop();
-
-        if (mSampleFile == null) {
-            File sampleDir = Environment.getExternalStorageDirectory();
-            if (!sampleDir.canWrite()) {
-                // Workaround for broken sdcard support on the device.
-                sampleDir = new File("/sdcard/sdcard");
-            }
-
-            try {
-                mSampleFile = File.createTempFile(SAMPLE_PREFIX, extension, sampleDir);
-            } catch (IOException e) {
-                setError(SDCARD_ACCESS_ERROR);
-                return;
-            }
+    public boolean startRecording(Context context, RecordParamsSetting.RecordParams params, int fileSizeLimit) {
+        LogUtil.i(TAG, "<startRecording> begin");
+        if (SoundRecorderService.STATE_IDLE != mCurrentState) {
+            return false;
         }
+        reset();
 
-        mRecorder = new MediaRecorder();
-        mRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-        mRecorder.setOutputFormat(outputFileFormat);
-        mRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
-        mRecorder.setOutputFile(mSampleFile.getAbsolutePath());
-
-        try {
-            mRecorder.prepare();
-        } catch (IOException e) {
-            setError(INTERNAL_ERROR);
-            mRecorder.reset();
-            mRecorder.release();
-            mRecorder = null;
-            return;
+        if (!createRecordingFile(params.mExtension)) {
+            LogUtil.i(TAG, "<startRecording> createRecordingFile return false");
+            return false;
         }
-
-        try {
-            mRecorder.start();
-        } catch (RuntimeException e) {
-            AudioManager audioMngr = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-            final boolean isInCall = ((audioMngr.getMode() == AudioManager.MODE_IN_CALL) ||
-                    (audioMngr.getMode() == AudioManager.MODE_IN_COMMUNICATION));
-            if (isInCall) {
-                setError(IN_CALL_RECORD_ERROR);
-            } else {
-                setError(INTERNAL_ERROR);
-            }
-            mRecorder.reset();
-            mRecorder.release();
-            mRecorder = null;
-            return;
+        if (!initAndStartMediaRecorder(context, params, fileSizeLimit)) {
+            LogUtil.i(TAG, "<startRecording> initAndStartMediaRecorder return false");
+            return false;
         }
-
-        mSampleStart = System.currentTimeMillis();
-        setState(RECORDING_STATE);
-    }
-
-    public void stopRecording() {
-        if (mRecorder == null) {
-            return;
-        }
-
-        mRecorder.stop();
-        mRecorder.release();
-        mRecorder = null;
-
-        mSampleLength = (int) ((System.currentTimeMillis() - mSampleStart) / 1000);
-        setState(IDLE_STATE);
-    }
-
-    public void startPlayback() {
-        stop();
-
-        mPlayer = new MediaPlayer();
-        try {
-            mPlayer.setDataSource(mSampleFile.getAbsolutePath());
-            mPlayer.setOnCompletionListener(this);
-            mPlayer.setOnErrorListener(this);
-            mPlayer.prepare();
-            mPlayer.start();
-        } catch (IllegalArgumentException e) {
-            setError(INTERNAL_ERROR);
-            mPlayer = null;
-            return;
-        } catch (IOException e) {
-            setError(SDCARD_ACCESS_ERROR);
-            mPlayer = null;
-            return;
-        }
-
-        mSampleStart = System.currentTimeMillis();
-        setState(PLAYING_STATE);
-    }
-
-    public void stopPlayback() {
-        if (mPlayer == null) {
-            // we were not in playback
-            return;
-        }
-
-        mPlayer.stop();
-        mPlayer.release();
-        mPlayer = null;
-        setState(IDLE_STATE);
-    }
-
-    public void stop() {
-        stopRecording();
-        stopPlayback();
-    }
-
-    @Override
-    public void onCompletion(MediaPlayer mp) {
-        stop();
-    }
-
-    @Override
-    public boolean onError(MediaPlayer mp, int what, int extra) {
-        stop();
-        setError(SDCARD_ACCESS_ERROR);
+        mSampleStart = SystemClock.elapsedRealtime();
+        setCurrentState(SoundRecorderService.STATE_RECORDING);
+        LogUtil.i(TAG, "<startRecording> end");
         return true;
     }
 
+    /**
+     * Pause the recording.
+     *
+     * @return the pause result
+     */
+    public boolean pauseRecording() {
+        if ((SoundRecorderService.STATE_RECORDING != mCurrentState) || (null == mRecorder)) {
+            mListener.onError(this, SoundRecorderService.STATE_ERROR_CODE);
+            return false;
+        }
+        try {
+            mRecorder.pause();
+        } catch (RuntimeException e) {
+            LogUtil.e(TAG, "<pauseRecording> IllegalArgumentException");
+            handleException(false, e);
+            mListener.onError(this, ErrorHandle.ERROR_RECORDING_FAILED);
+            return false;
+        }
+        mPreviousTime += SystemClock.elapsedRealtime() - mSampleStart;
+        setCurrentState(SoundRecorderService.STATE_PAUSE_RECORDING);
+        return true;
+    }
+
+    /**
+     * Resume the recording.
+     *
+     * @return the resume result
+     */
+    public boolean goonRecording() {
+        if ((SoundRecorderService.STATE_PAUSE_RECORDING != mCurrentState) || (null == mRecorder)) {
+            return false;
+        }
+        // Handle RuntimeException if the recording couldn't start
+        try {
+            mRecorder.resume();
+        } catch (RuntimeException exception) {
+            LogUtil.e(TAG, "<goOnRecording> IllegalArgumentException");
+            exception.printStackTrace();
+            mRecorder.reset();
+            mRecorder.release();
+            mRecorder = null;
+            mListener.onError(this, ErrorHandle.ERROR_RECORDING_FAILED);
+            return false;
+        }
+
+        mSampleStart = SystemClock.elapsedRealtime();
+        setCurrentState(SoundRecorderService.STATE_RECORDING);
+        return true;
+    }
+
+    /**
+     * Stop recording.
+     *
+     * @return the stop result
+     */
+    public boolean stopRecording() {
+        LogUtil.i(TAG, "<stopRecording> start");
+        if (((SoundRecorderService.STATE_PAUSE_RECORDING != mCurrentState) &&
+                (SoundRecorderService.STATE_RECORDING != mCurrentState)) || (null == mRecorder)) {
+            LogUtil.i(TAG, "<stopRecording> end 1");
+            mListener.onError(this, SoundRecorderService.STATE_ERROR_CODE);
+            return false;
+        }
+        boolean isAdd = (SoundRecorderService.STATE_RECORDING == mCurrentState) ? true : false;
+        synchronized (this) {
+            try {
+                if (mCurrentState != SoundRecorderService.STATE_IDLE) {
+                    mRecorder.stop();
+                }
+            } catch (RuntimeException exception) {
+                /** modified for stop recording failed. */
+                handleException(false, exception);
+                mListener.onError(this, ErrorHandle.ERROR_RECORDING_FAILED);
+                LogUtil.e(TAG,
+                        "<stopRecording> recorder illegalstate exception in recorder.stop()");
+            } finally {
+                if (null != mRecorder) {
+                    mRecorder.reset();
+                    mRecorder.release();
+                    mRecorder = null;
+                }
+                if (isAdd) {
+                    mPreviousTime += SystemClock.elapsedRealtime() - mSampleStart;
+                }
+                mSampleLength = mPreviousTime;
+                LogUtil.i(TAG, "<stopRecording> mSampleLength in ms is " + mPreviousTime);
+                LogUtil.i(TAG, "<stopRecording> mSampleLength in s is = " + mSampleLength);
+                setCurrentState(SoundRecorderService.STATE_IDLE);
+            }
+        }
+
+        LogUtil.i(TAG, "<stopRecording> end 2");
+        return true;
+    }
+
+    private boolean initAndStartMediaRecorder(
+            Context context, RecordParamsSetting.RecordParams recordParams, int fileSizeLimit) {
+        LogUtil.i(TAG, "<initAndStartMediaRecorder> start");
+        try {
+            /**
+             * Changed to catch the IllegalStateException and NullPointerException.
+             * And the IllegalStateException will be caught and handled in RuntimeException
+             */
+            mSelectEffect = recordParams.mAudioEffect;
+            IRecordingTimeCalculationExt ext =
+                    ExtensionHelper.getRecordingTimeCalculationExt(context);
+            mRecorder = ext.getMediaRecorder();
+            mRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+            mRecorder.setOutputFormat(recordParams.mOutputFormat);
+            mRecorder.setOutputFile(mSampleFile.getAbsolutePath());
+            mRecorder.setAudioEncoder(recordParams.mAudioEncoder);
+            mRecorder.setAudioChannels(recordParams.mAudioChannels);
+            mRecorder.setAudioEncodingBitRate(recordParams.mAudioEncodingBitRate);
+            mRecorder.setAudioSamplingRate(recordParams.mAudioSamplingRate);
+            if (fileSizeLimit > 0) {
+                mRecorder.setMaxFileSize(fileSizeLimit);
+            }
+            mRecorder.setOnErrorListener(this);
+            mRecorder.prepare();
+            mRecorder.start();
+        } catch (IOException exception) {
+            LogUtil.e(TAG, "<initAndStartMediaRecorder> IO exception");
+            // M:Add for when error ,the tmp file should been delete.
+            handleException(true, exception);
+            mListener.onError(this, ErrorHandle.ERROR_RECORDING_FAILED);
+            return false;
+        } catch (NullPointerException exception) {
+            /**
+             * used to catch the null pointer exception in ALPS01226113,
+             * and never show any toast or dialog to end user. Because this
+             * error just happened when fast tapping the file list button
+             * after tapping record button(which triggered by tapping the
+             * recording button in audio play back view).@{
+             */
+            handleException(true, exception);
+            return false;
+        } catch (IllegalStateException exception) {
+            LogUtil.e(TAG, "<initAndStartMediaRecorder> RuntimeException");
+            // M:Add for when error ,the tmp file should been delete.
+            handleException(true, exception);
+            mListener.onError(this, ErrorHandle.ERROR_RECORDER_OCCUPIED);
+            return false;
+        } catch (RuntimeException exception) {
+            LogUtil.e(TAG, "<initAndStartMediaRecorder> RuntimeException");
+            handleException(true, exception);
+            mListener.onError(this, ErrorHandle.ERROR_RECORDING_FAILED);
+            return false;
+        }
+        LogUtil.i(TAG, "<initAndStartMediaRecorder> end");
+        return true;
+    }
+
+    private boolean createRecordingFile(String extension) {
+        LogUtil.i(TAG, "<createRecordingFile> begin");
+        String myExtension = extension + SAMPLE_SUFFIX;
+        File sampleDir = null;
+        if (null == mStorageManager) {
+            return false;
+        }
+        sampleDir = new File(Environment.getExternalStorageDirectory().getAbsolutePath());
+        LogUtil.i(TAG, "<createRecordingFile> sd card directory is:" + sampleDir);
+        String sampleDirPath = sampleDir.getAbsolutePath() + File.separator + RECORD_FOLDER;
+        sampleDir = new File(sampleDirPath);
+
+        // find a available name of recording folder,
+        // Recording/Recording(1)/Recording(2)
+        int dirID = 1;
+        while ((null != sampleDir) && sampleDir.exists() && !sampleDir.isDirectory()) {
+            sampleDir = new File(sampleDirPath + '(' + dirID + ')');
+            dirID++;
+        }
+
+        if ((null != sampleDir) && !sampleDir.exists() && !sampleDir.mkdirs()) {
+            LogUtil.i(TAG, "<createRecordingFile> make directory [" + sampleDir.getAbsolutePath()
+                    + "] fail");
+        }
+
+        boolean isCreateSuccess = true;
+        try {
+            if (null != sampleDir) {
+                LogUtil.i(TAG, "<createRecordingFile> sample directory  is:"
+                        + sampleDir.toString());
+            }
+            SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
+            String time = simpleDateFormat.format(new Date(System.currentTimeMillis()));
+            StringBuilder stringBuilder = new StringBuilder();
+            stringBuilder.append(SAMPLE_PREFIX).append(time).append(myExtension);
+            String name = stringBuilder.toString();
+            mSampleFile = new File(sampleDir, name);
+            isCreateSuccess = mSampleFile.createNewFile();
+            LogUtil.i(TAG, "<createRecordingFile> creat file success is " + isCreateSuccess);
+            LogUtil.i(TAG, "<createRecordingFile> mSampleFile.getAbsolutePath() is: "
+                    + mSampleFile.getAbsolutePath());
+        } catch (IOException e) {
+            mListener.onError(this, ErrorHandle.ERROR_CREATE_FILE_FAILED);
+            LogUtil.e(TAG, "<createRecordingFile> io exception happens");
+            e.printStackTrace();
+            isCreateSuccess = false;
+        } finally {
+            LogUtil.i(TAG, "<createRecordingFile> end");
+            return isCreateSuccess;
+        }
+    }
+
+    /**
+     * M: Handle Exception when call the function of MediaRecorder.
+     *
+     * @param isDeleteSample need to delete sample file or not
+     * @param exception      the exception info
+     */
+    public void handleException(boolean isDeleteSample, Exception exception) {
+        LogUtil.i(TAG, "<handleException> the exception is: " + exception);
+        exception.printStackTrace();
+        if (isDeleteSample && mSampleFile != null) {
+            mSampleFile.delete();
+        }
+        try {
+            if (mRecorder != null) {
+                mRecorder.reset();
+            }
+        } catch (IllegalStateException ex) {
+            LogUtil.i(TAG, "Excpetion " + ex);
+        } finally {
+            mRecorder.release();
+            mRecorder = null;
+        }
+    }
+
+    @Override
+    public void onError(MediaRecorder mr, int what, int extra) {
+        LogUtil.i(TAG, "<onError> errorType = " + what + "; extraCode = " + extra);
+        stopRecording();
+        mListener.onError(this, ErrorHandle.ERROR_RECORDING_FAILED);
+    }
+
+    /**
+     * get the current amplitude of MediaRecorder, used by VUMeter.
+     *
+     * @return
+     */
     public int getMaxAmplitude() {
-        if (RECORDING_STATE != mState) {
-            return 0;
+        synchronized (this) {
+            if (null == mRecorder) {
+                return 0;
+            }
+            return (SoundRecorderService.STATE_RECORDING != mCurrentState) ? 0 : mRecorder
+                    .getMaxAmplitude();
         }
-
-        return mRecorder.getMaxAmplitude();
     }
 
-    public void setOnStateChangedListener(OnStateChangedListener onStateChangedListener) {
-        mOnStateChangedListener = onStateChangedListener;
-    }
-
-    public int getProgress() {
-        if (RECORDING_STATE == mState || PLAYING_STATE == mState) {
-            return (int) ((System.currentTimeMillis() - mSampleStart) / 1000);
+    /**
+     * get how long time we has recorded.
+     *
+     * @return the record length, in millseconds
+     */
+    public long getCurrentProgress() {
+        if (SoundRecorderService.STATE_RECORDING == mCurrentState) {
+            long current = SystemClock.elapsedRealtime();
+            return (long) (current - mSampleStart + mPreviousTime);
+        } else if (SoundRecorderService.STATE_PAUSE_RECORDING == mCurrentState) {
+            return (long) (mPreviousTime);
         }
-
         return 0;
     }
 
-    private void setError(int error) {
-        if (mOnStateChangedListener != null) {
-            mOnStateChangedListener.onError(error);
-        }
-    }
-
-    private void signalStateChanged(int state) {
-        if (mOnStateChangedListener != null) {
-            mOnStateChangedListener.onStateChanged(state);
-        }
-    }
-
-    private void setState(int state) {
-        if (state == mState) {
+    private void setCurrentState(int currentState) {
+        if (currentState == mCurrentState) {
             return;
         }
 
-        mState = state;
-        signalStateChanged(mState);
+        mCurrentState = currentState;
+        if (mListener != null) {
+            mListener.onStateChanged(this, currentState);
+        }
     }
 
-    public int getState() {
-        return mState;
+    public int getCurrentState() {
+        return mCurrentState;
     }
 
-    public int getSampleLength() {
+    public long getSampleLength() {
         return mSampleLength;
     }
 
@@ -280,9 +429,12 @@ public class Recorder implements MediaPlayer.OnCompletionListener, MediaPlayer.O
         return mSampleFile;
     }
 
-    public interface OnStateChangedListener {
-        void onStateChanged(int state);
-
-        void onError(int error);
+    /**
+     * get the file path of current sample file.
+     *
+     * @return
+     */
+    public String getSampleFilePath() {
+        return (null == mSampleFile) ? null : mSampleFile.getAbsolutePath();
     }
 }

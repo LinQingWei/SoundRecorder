@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AMR encoder related pramameters -->
+    <integer-array name="amr_params">
+        <!-- Encode type is MediaRecorder.AudioEncoder.AMR_NB -->
+        <item>1</item>
+        <!-- Audio channel is mono  -->
+        <item>1</item>
+        <!-- Encode bitrate -->
+        <item>12200</item>
+        <!-- Sample rate -->
+        <item>8000</item>
+        <!-- Recording file outputFormat is MediaRecorder.OutputFormat.AMR_NB -->
+        <item>3</item>
+    </integer-array>
+    <!-- AWB encoder related pramameters -->
+    <integer-array name="awb_params">
+        <!-- Encode type is MediaRecorder.AudioEncoder.AMR_WB -->
+        <item>2</item>
+        <!-- Audio channel is mono  -->
+        <item>1</item>
+        <!-- Encode bitrate -->
+        <item>28500</item>
+        <!-- Sample rate -->
+        <item>16000</item>
+        <!-- Recording file outputFormat is MediaRecorder.OutputFormat.AMR_WB -->
+        <item>4</item>
+    </integer-array>
+    <!-- AAC encoder related pramameters -->
+    <integer-array name="aac_params">
+        <!-- Encode type is MediaRecorder.AudioEncoder.AAC -->
+        <item>3</item>
+        <!-- Audio channel is stereo  -->
+        <item>2</item>
+        <!-- Encode bitrate -->
+        <item>128000</item>
+        <!-- Sample rate -->
+        <item>48000</item>
+        <!-- Recording file outputFormat is MediaRecorder.OutputFormat.AAC_ADTS -->
+        <item>6</item>
+    </integer-array>
+</resources>

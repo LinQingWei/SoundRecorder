@@ -1,20 +1,17 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/whole_view"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
-
-    <ImageView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:scaleType="fitXY"
-        android:src="@android:drawable/divider_horizontal_dark" />
+    android:orientation="vertical"
+    android:splitMotionEvents="false">
 
     <RelativeLayout
         android:id="@+id/timerViewLayout"
         android:layout_width="match_parent"
-        android:layout_height="242dip"
-        android:background="@drawable/bg_gradient">
+        android:layout_height="240dp"
+        android:background="@drawable/bg_gradient"
+        android:splitMotionEvents="false">
 
         <TextView
             android:id="@+id/timerView"
@@ -22,7 +19,37 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_centerInParent="true"
-            android:textSize="112dip" />
+            android:textDirection="locale"
+            android:textSize="112dp" />
+
+        <LinearLayout
+            android:id="@+id/recordfileMessage2Layout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/timerView"
+            android:layout_centerHorizontal="true"
+            android:baselineAligned="false"
+            android:orientation="horizontal"
+            android:splitMotionEvents="false">
+
+            <ImageView
+                android:id="@+id/currState"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical" />
+
+            <TextView
+                android:id="@+id/recordingFileName"
+                style="@android:style/TextAppearance.Medium"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_marginLeft="8dp"
+                android:layout_marginStart="8dp"
+                android:singleLine="true"
+                android:textDirection="locale" />
+
+        </LinearLayout>
 
         <LinearLayout
             android:id="@+id/stateMessage2Layout"
@@ -31,7 +58,8 @@
             android:layout_above="@+id/timerView"
             android:layout_centerHorizontal="true"
             android:baselineAligned="false"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:splitMotionEvents="false">
 
             <ImageView
                 android:id="@+id/stateLED"
@@ -45,18 +73,22 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
-                android:layout_marginLeft="5px"
-                android:text="@string/recording" />
+                android:layout_marginLeft="8dp"
+                android:layout_marginStart="8dp"
+                android:text="@string/recording"
+                android:textDirection="locale" />
 
         </LinearLayout>
 
         <TextView
             android:id="@+id/stateMessage1"
             style="@android:style/TextAppearance.Small"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_below="@+id/stateMessage2Layout"
-            android:layout_centerHorizontal="true" />
+            android:layout_centerHorizontal="true"
+            android:gravity="center_horizontal"
+            android:textDirection="locale" />
 
         <ProgressBar
             android:id="@+id/stateProgressBar"
@@ -64,61 +96,91 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_above="@+id/timerView"
-            android:layout_marginLeft="20dip"
-            android:layout_marginRight="20dip"
+            android:layout_marginEnd="20dip"
+            android:layout_marginStart="20dip"
             android:max="100"
             android:orientation="horizontal"
             android:progress="0" />
 
     </RelativeLayout>
 
-    <ImageView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:scaleType="fitXY"
-        android:src="@android:drawable/divider_horizontal_dark" />
 
     <FrameLayout
+        android:id="@+id/frameLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1">
-
-        <LinearLayout
-            android:id="@+id/exitButtons"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
-            android:layout_gravity="center_vertical"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/discardButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="2dip"
-                android:layout_marginRight="15dip"
-                android:layout_weight="1"
-                android:text="@string/discard" />
-
-            <Button
-                android:id="@+id/acceptButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="15dip"
-                android:layout_marginRight="2dip"
-                android:layout_weight="1"
-                android:text="@string/accept" />
-        </LinearLayout>
+        android:layout_weight="1"
+        android:splitMotionEvents="false">
 
         <RelativeLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:splitMotionEvents="false">
+
+            <ImageView
+                android:id="@+id/firstLine"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:scaleType="fitXY"
+                android:src="@android:drawable/divider_horizontal_dark" />
+
+            <LinearLayout
+                android:id="@+id/exitButtons"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/firstLine"
+                android:layout_centerInParent="true"
+                android:layout_gravity="center_vertical"
+                android:background="@color/linearLayoutGrayColor"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:splitMotionEvents="false"
+                android:visibility="gone">
+
+                <Button
+                    android:id="@+id/discardButton"
+                    style="?android:attr/buttonBarButtonStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="55dip"
+                    android:layout_weight="1"
+                    android:text="@string/discard" />
+
+                <ImageView
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@android:drawable/divider_horizontal_dark" />
+
+                <Button
+                    android:id="@+id/acceptButton"
+                    style="?android:attr/buttonBarButtonStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="55dip"
+                    android:layout_weight="1"
+                    android:ellipsize="marquee"
+                    android:singleLine="true"
+                    android:text="@string/accept" />
+
+            </LinearLayout>
+        </RelativeLayout>
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:splitMotionEvents="false">
+
+            <ImageView
+                android:id="@+id/secondLine"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:scaleType="fitXY"
+                android:src="@android:drawable/divider_horizontal_dark" />
 
             <cn.way.soundrecorder.widget.VUMeter
                 android:id="@+id/uvMeter"
-                android:layout_width="200px"
-                android:layout_height="80px"
+                android:layout_width="125dip"
+                android:layout_height="50dip"
                 android:layout_centerInParent="true" />
         </RelativeLayout>
 
@@ -134,34 +196,56 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="60dip"
-        android:background="@android:drawable/title_bar"
         android:gravity="center_horizontal"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:splitMotionEvents="false">
 
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:id="@+id/buttonParent"
+            android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginBottom="4dip"
-            android:layout_marginTop="4dip"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:splitMotionEvents="false">
 
             <ImageButton
                 android:id="@+id/recordButton"
-                style="@style/MediaButton"
+                style="?android:attr/buttonBarButtonStyle"
+                android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:src="@drawable/ic_record" />
+                android:layout_weight="1"
+                android:src="@drawable/record" />
+
+            <ImageButton
+                android:id="@+id/pauseRecordingButton"
+                style="?android:attr/buttonBarButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:src="@drawable/pause" />
 
             <ImageButton
                 android:id="@+id/playButton"
-                style="@style/MediaButton"
+                style="?android:attr/buttonBarButtonStyle"
+                android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:src="@drawable/ic_play" />
+                android:layout_weight="1"
+                android:src="@drawable/play" />
 
             <ImageButton
                 android:id="@+id/stopButton"
-                style="@style/MediaButton"
+                style="?android:attr/buttonBarButtonStyle"
+                android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:src="@drawable/ic_stop" />
+                android:layout_weight="1"
+                android:src="@drawable/stop" />
+
+            <ImageButton
+                android:id="@+id/fileListButton"
+                style="?android:attr/buttonBarButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:src="@drawable/recording_file_list" />
 
         </LinearLayout>
 
