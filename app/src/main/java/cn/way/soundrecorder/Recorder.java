@@ -30,11 +30,6 @@ public class Recorder implements MediaRecorder.OnErrorListener {
     public static final String SAMPLE_SUFFIX = ".tmp";
     public static final String RECORD_FOLDER = "Recording";
 
-    public static final int NO_ERROR = 0;
-    public static final int SDCARD_ACCESS_ERROR = 1;
-    public static final int INTERNAL_ERROR = 2;
-    public static final int IN_CALL_RECORD_ERROR = 3;
-
     // time at which latest record or play operation started
     private long mSampleStart;
     // length of current sample
@@ -42,7 +37,7 @@ public class Recorder implements MediaRecorder.OnErrorListener {
     private long mPreviousTime;
     private File mSampleFile;
 
-    MediaRecorder mRecorder;
+    private MediaRecorder mRecorder;
     private RecorderListener mListener;
     private final StorageManager mStorageManager;
 

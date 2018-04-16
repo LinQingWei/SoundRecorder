@@ -635,10 +635,10 @@ public class SoundRecorderActivity extends AppCompatActivity
                 mPlayButton.setVisibility(View.VISIBLE);
                 mPlayButton.setEnabled(true);
                 mPlayButton.setFocusable(true);
-                mPlayButton.setImageResource(R.drawable.play);
+                mPlayButton.setImageResource(R.drawable.ic_play);
             }
             mRemainingTimeTextView.setVisibility(View.INVISIBLE);
-            mPlayingStateImageView.setImageResource(R.drawable.stop);
+            mPlayingStateImageView.setImageResource(R.drawable.ic_stop);
             mPlayingStateImageView.setVisibility(View.VISIBLE);
             mRecordingFileNameTextView.setVisibility(View.VISIBLE);
             mExitButtons.setVisibility(View.INVISIBLE);
@@ -689,7 +689,7 @@ public class SoundRecorderActivity extends AppCompatActivity
         mPlayButton.setVisibility(View.VISIBLE);
         mPlayButton.setEnabled(true);
         mPlayButton.setFocusable(true);
-        mPlayButton.setImageResource(R.drawable.play);
+        mPlayButton.setImageResource(R.drawable.ic_play);
         mStopButton.setVisibility(View.VISIBLE);
         mFileListButton.setVisibility(View.GONE);
         mPauseRecordingButton.setVisibility(View.GONE);
@@ -699,7 +699,7 @@ public class SoundRecorderActivity extends AppCompatActivity
         mRemainingTimeTextView.setVisibility(View.INVISIBLE);
         mRecordingStateImageView.setVisibility(View.INVISIBLE);
         mStateTextView.setVisibility(View.INVISIBLE);
-        mPlayingStateImageView.setImageResource(R.drawable.pause);
+        mPlayingStateImageView.setImageResource(R.drawable.ic_pause);
         mPlayingStateImageView.setVisibility(View.VISIBLE);
         mRecordingFileNameTextView.setVisibility(View.VISIBLE);
         boolean isCurrentFileWaitToSave = false;
@@ -756,7 +756,7 @@ public class SoundRecorderActivity extends AppCompatActivity
             mPauseRecordingButton.setVisibility(View.GONE);
         }
         mRecordingStateImageView.setVisibility(View.VISIBLE);
-        mRecordingStateImageView.setImageResource(R.drawable.recording_led);
+        mRecordingStateImageView.setImageResource(R.drawable.ic_recording_led);
         mStateTextView.setVisibility(View.VISIBLE);
         mStateTextView.setText(res.getString(R.string.recording));
         mRemainingTimeTextView.setText(EMPTY);
@@ -798,7 +798,7 @@ public class SoundRecorderActivity extends AppCompatActivity
         mStopButton.setEnabled(true);
         mStopButton.setFocusable(true);
         mRecordingStateImageView.setVisibility(View.VISIBLE);
-        mRecordingStateImageView.setImageResource(R.drawable.idle_led);
+        mRecordingStateImageView.setImageResource(R.drawable.ic_idle_led);
         mStateTextView.setVisibility(View.VISIBLE);
         mStateTextView.setText(res.getString(R.string.recording_paused));
         mRemainingTimeTextView.setVisibility(View.INVISIBLE);
@@ -827,7 +827,7 @@ public class SoundRecorderActivity extends AppCompatActivity
         mPlayButton.setVisibility(View.VISIBLE);
         mPlayButton.setEnabled(true);
         mPlayButton.setFocusable(true);
-        mPlayButton.setImageResource(R.drawable.pause);
+        mPlayButton.setImageResource(R.drawable.ic_pause);
         mFileListButton.setVisibility(View.GONE);
         mPauseRecordingButton.setVisibility(View.GONE);
         mPauseRecordingButton.setSoundEffectsEnabled(false);
@@ -838,7 +838,7 @@ public class SoundRecorderActivity extends AppCompatActivity
         mStateTextView.setVisibility(View.INVISIBLE);
         mRemainingTimeTextView.setVisibility(View.INVISIBLE);
         mPlayingStateImageView.setVisibility(View.VISIBLE);
-        mPlayingStateImageView.setImageResource(R.drawable.play);
+        mPlayingStateImageView.setImageResource(R.drawable.ic_play);
         mRecordingFileNameTextView.setVisibility(View.VISIBLE);
         if (!mService.isCurrentFileWaitToSave()) {
             mExitButtons.setVisibility(View.INVISIBLE);

@@ -244,7 +244,7 @@ public class RemainingTimeCalculator {
      * @param bitRate the bit rate to set in bits/sec.
      */
     public void setBitRate(int bitRate) {
-        mBytesPerSecond = bitRate / 8;
+        mBytesPerSecond = bitRate / BIT_RATE;
     }
 
     /**
